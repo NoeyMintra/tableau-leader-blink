@@ -22,6 +22,22 @@
 <div id="status">Connecting to Tableau…</div>
 <ul id="list"></ul>
 <script>
+  window.addEventListener("load", async () => {
+    const status = document.getElementById("status");
+
+    try {
+      if (!window.tableau || !window.tableau.extensions) {
+        throw new Error(
+          "ไม่พบ Tableau Extensions API กรุณาตรวจสอบการโหลดไลบรารี"
+        );
+      }
+
+      await window.tableau.extensions.initializeAsync();
+      status.textContent = "Connected to Tableau";
+    } catch (error) {
+      status.textContent = "Extension initialization failed: " + error.message;
+    }
+  });
 (async function () {
   const status = document.getElementById("status");
   const list = document.getElementById("list");
