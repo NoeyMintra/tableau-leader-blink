@@ -1,118 +1,173 @@
+
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LEADER ACCESS Blink Extension</title>
-<script src="https://tableau.github.io/extensions-api/lib/tableau.extensions.1.latest.js"></script>
-<style>
-  html, body { margin:0; width:100%; height:100%; background:transparent; color:#fff;
-    font-family:Arial, sans-serif; overflow:auto; }
-  #status { padding:6px; font-size:12px; color:#ffd966; }
-  #list { margin:0; padding:0; list-style:none; }
-  .item { box-sizing:border-box; min-height:20px; height:20px; display:flex; align-items:center;
-    justify-content:center; border-bottom:1px solid #6bdcf4; font-size:12px; }
-  .yes { color:#00ff00; }
-  .no { color:#ff001e; animation: blink 1s steps(2, start) infinite; }
-  @keyframes blink { to { visibility:hidden; } }
-  #help { padding:8px; white-space:pre-wrap; font-size:12px; color:#fff; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEADER ACCESS Blink Extension</title>
+
+  <script src="https://tableau.github.io/extensions-api/lib/tableau.extensions.1.latest.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: transparent;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+
+    #status {
+      padding: 6px;
+      font-size: 12px;
+      color: #ffd966;
+    }
+
+    #list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .item {
+      box-sizing: border-box;
+      min-height: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid #6bdcf4;
+      font-size: 12px;
+    }
+
+    .yes {
+      color: #00ff00;
+    }
+
+    .no {
+      color: #ff001e;
+      animation: blink 1s steps(2, start) infinite;
+    }
+
+    @keyframes blink {
+      to { visibility: hidden; }
+    }
+  </style>
 </head>
+
 <body>
-<div id="status">Connecting to Tableau…</div>
-<ul id="list"></ul>
-<script>
-  window.addEventListener("load", async () => {
-    const status = document.getElementById("status");
+  <div id="status">Connecting to Tableau...</div>
+  <ul id="list"></ul>
 
-    try {
-      if (!window.tableau || !window.tableau.extensions) {
-        throw new Error(
-          "ไม่พบ Tableau Extensions API กรุณาตรวจสอบการโหลดไลบรารี"
-        );
+  <script>
+    window.addEventListener("load", async function () {
+      const status = document.getElementById("status");
+      const list = document.getElementById("list");
+
+      function showError(message) {
+        status.textContent = message;
+        status.style.color = "#ff8080";
       }
 
-      await window.tableau.extensions.initializeAsync();
-      status.textContent = "Connected to Tableau";
-    } catch (error) {
-      status.textContent = "Extension initialization failed: " + error.message;
-    }
-  });
-(async function () {
-  const status = document.getElementById("status");
-  const list = document.getElementById("list");
+      function cellText(cell) {
+        if (!cell) return "";
 
-  function showError(message) {
-    status.textContent = message;
-    status.style.color = "#ff8080";
-  }
+        if (cell.formattedValue !== undefined) {
+          return String(cell.formattedValue).trim();
+        }
 
-  function cellText(cell) {
-    if (!cell) return "";
-    if (cell.formattedValue !== undefined) return String(cell.formattedValue).trim();
-    if (cell.value !== undefined) return String(cell.value).trim();
-    return "";
-  }
+        if (cell.value !== undefined) {
+          return String(cell.value).trim();
+        }
 
-  async function refresh() {
-    try {
-      const dashboard = tableau.extensions.dashboardContent.dashboard;
-      const worksheets = dashboard.worksheets || [];
-      const ws = worksheets.find(w => w.name.trim().toUpperCase() === "LEADER");
-      if (!ws) {
-        showError('ไม่พบ Worksheet ชื่อ "LEADER" บน Dashboard นี้');
-        return;
+        return "";
       }
 
-      const data = await ws.getSummaryDataAsync({ maxRows: 0 });
-      const columns = data.columns || [];
-      let accessIndex = columns.findIndex(c =>
-        String(c.fieldName || c.caption || "").trim().toUpperCase() === "ACCESS"
-      );
-
-      // Fallback: Tableau may expose the caption differently.
-      if (accessIndex < 0) {
-        accessIndex = columns.findIndex(c =>
-          String(c.fieldName || "").toUpperCase().includes("ACCESS") ||
-          String(c.caption || "").toUpperCase().includes("ACCESS")
-        );
-      }
-      if (accessIndex < 0) {
-        showError('ไม่พบฟิลด์ ACCESS ในข้อมูลสรุปของ Worksheet LEADER');
-        return;
-      }
-
-      const rows = (data.data || []).map(row => cellText(row[accessIndex]).toUpperCase())
-        .filter(v => v === "NO" || v === "YES");
-
-      list.replaceChildren();
-      rows.forEach(value => {
-        const li = document.createElement("li");
-        li.className = "item " + (value === "NO" ? "no" : "yes");
-        li.textContent = value;
-        list.appendChild(li);
-      });
-      status.textContent = "ACCESS: " + rows.length + " rows";
-      status.style.color = "#b7e4ff";
-    } catch (e) {
-      showError("อ่านข้อมูล Tableau ไม่สำเร็จ: " + (e && e.message ? e.message : e));
-    }
-  }
-
-  try {
-    await tableau.extensions.initializeAsync();
-    await refresh();
-    const dashboard = tableau.extensions.dashboardContent.dashboard;
-    dashboard.worksheets.forEach(ws => {
       try {
-        ws.addEventListener(tableau.TableauEventType.FilterChanged, refresh);
-        ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, refresh);
-      } catch (_) {}
+        if (!window.tableau || !window.tableau.extensions) {
+          throw new Error(
+            "Tableau Extensions API โหลดไม่สำเร็จ"
+          );
+        }
+
+        await window.tableau.extensions.initializeAsync();
+
+        const dashboard =
+          window.tableau.extensions.dashboardContent.dashboard;
+
+        async function refresh() {
+          try {
+            const worksheets = dashboard.worksheets || [];
+
+            const ws = worksheets.find(
+              w => w.name.trim().toUpperCase() === "LEADER"
+            );
+
+            if (!ws) {
+              showError('ไม่พบ Worksheet ชื่อ "LEADER"');
+              return;
+            }
+
+            const data = await ws.getSummaryDataAsync({
+              maxRows: 0
+            });
+
+            const columns = data.columns || [];
+
+            const accessIndex = columns.findIndex(c =>
+              String(c.fieldName || "").trim().toUpperCase() === "ACCESS" ||
+              String(c.caption || "").trim().toUpperCase() === "ACCESS"
+            );
+
+            if (accessIndex < 0) {
+              showError("ไม่พบฟิลด์ ACCESS ใน Worksheet LEADER");
+              return;
+            }
+
+            const rows = (data.data || [])
+              .map(row =>
+                cellText(row[accessIndex]).toUpperCase()
+              )
+              .filter(value => value === "YES" || value === "NO");
+
+            list.replaceChildren();
+
+            rows.forEach(value => {
+              const li = document.createElement("li");
+              li.className =
+                "item " + (value === "NO" ? "no" : "yes");
+              li.textContent = value;
+              list.appendChild(li);
+            });
+
+            status.textContent = "ACCESS: " + rows.length + " rows";
+            status.style.color = "#b7e4ff";
+
+          } catch (error) {
+            showError(
+              "อ่านข้อมูลไม่สำเร็จ: " + error.message
+            );
+          }
+        }
+
+        await refresh();
+
+        dashboard.worksheets.forEach(ws => {
+          try {
+            ws.addEventListener(
+              window.tableau.TableauEventType.FilterChanged,
+              refresh
+            );
+          } catch (_) {}
+        });
+
+      } catch (error) {
+        showError(
+          "Extension initialization failed: " + error.message
+        );
+      }
     });
-  } catch (e) {
-    showError("Extension initialization failed: " + (e && e.message ? e.message : e));
-  }
-})();
-</script>
+  </script>
 </body>
 </html>
