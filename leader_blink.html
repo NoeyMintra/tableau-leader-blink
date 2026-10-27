@@ -131,7 +131,9 @@
               )
               .filter(value => value === "YES" || value === "NO");
 
-            list.replaceChildren();
+            while (list.firstChild) {
+            list.removeChild(list.firstChild);
+            }
 
             rows.forEach(value => {
               const li = document.createElement("li");
