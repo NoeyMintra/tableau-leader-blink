@@ -114,7 +114,18 @@
             const data = await ws.getSummaryDataAsync({
               maxRows: 0
             });
+            
             status.textContent = "ดึงข้อมูลสำเร็จ";
+            const columns = data.columns || [];
+
+const rankColumn = columns.find(c =>
+  String(c.fieldName || "").trim().toUpperCase().includes("RANK") ||
+  String(c.caption || "").trim().toUpperCase().includes("RANK")
+);
+
+status.textContent = rankColumn
+  ? "พบ RANK: " + (rankColumn.fieldName || rankColumn.caption)
+  : "ดึงข้อมูลสำเร็จ แต่ไม่พบ RANK";
             
 
             const columns = data.columns || [];
