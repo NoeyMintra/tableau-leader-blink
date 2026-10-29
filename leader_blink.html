@@ -112,9 +112,12 @@
               return;
             }
 
-            const data = await ws.getSummaryDataAsync({
+            /*const data = await ws.getSummaryDataAsync({
               maxRows: 0
-            });
+            });*/
+            const reader = await ws.getSummaryDataReaderAsync();
+            const data = await reader.getAllPagesAsync();
+            await reader.releaseAsync();
 
             const columns = data.columns || [];
 
