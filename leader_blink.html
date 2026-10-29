@@ -1,4 +1,4 @@
-
+```html
 <!doctype html>
 <html lang="th">
 <head>
@@ -10,51 +10,53 @@
 
   <style>
     html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  background: #00052b;
-  color: #ffffff;
-  font-family: Arial, sans-serif;
-  overflow: auto;
-}
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #00052b;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      overflow: auto;
+    }
 
-#status {
-  padding: 4px;
-  font-size: 11px;
-  color: #b7e4ff;
-  background: #00052b;
-}
+    #status {
+      padding: 4px;
+      font-size: 11px;
+      color: #b7e4ff;
+      background: #00052b;
+    }
 
-#list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+    #list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
 
-.item {
-  box-sizing: border-box;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #00052b;
-  border-bottom: 1px solid #36b9ff;
-  font-size: 12px;
-  line-height: 20px;
-}
+    .item {
+      box-sizing: border-box;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #00052b;
+      border-bottom: 1px solid #36b9ff;
+      font-size: 12px;
+      line-height: 20px;
+    }
 
-.yes {
-  color: #00ff00;
-}
+    .yes {
+      color: #00ff00;
+    }
 
-.no {
-  color: #ff001e;
-  animation: blink 1s steps(2, start) infinite;
-}
+    .no {
+      color: #ff001e;
+      animation: blink 1s steps(2, start) infinite;
+    }
 
     @keyframes blink {
-      to { visibility: hidden; }
+      to {
+        visibility: hidden;
+      }
     }
   </style>
 </head>
@@ -68,27 +70,64 @@
       const status = document.getElementById("status");
       const list = document.getElementById("list");
 
+      let refreshing = false;
+      let refreshAgain = false;
+
       function showError(message) {
         status.textContent = message;
         status.style.color = "#ff8080";
       }
 
       function cellText(cell) {
-        if (!cell) return "";
+        if (cell == null) return "";
 
-        if (cell.formattedValue !== undefined) {
+        if (cell.formattedValue !== undefined &&
+            cell.formattedValue !== null) {
           return String(cell.formattedValue).trim();
         }
 
-        if (cell.value !== undefined) {
+        if (cell.value !== undefined && cell.value !== null) {
           return String(cell.value).trim();
         }
 
         return "";
       }
 
+      function getColumnIndex(columns, name) {
+        return columns.findIndex(c => {
+          const fieldName = String(c.fieldName || "")
+            .trim().toUpperCase();
+
+          const caption = String(c.caption || "")
+            .trim().toUpperCase();
+
+          return fieldName === name || caption === name;
+        });
+      }
+
+      function clearList() {
+        while (list.firstChild) {
+          list.removeChild(list.firstChild);
+        }
+      }
+
+      function renderRows(rows) {
+        clearList();
+
+        rows.forEach(row => {
+          const li = document.createElement("li");
+
+          li.className =
+            "item " + (row.access === "NO" ? "no" : "yes");
+
+          li.textContent = row.access;
+          list.appendChild(li);
+        });
+      }
+
       try {
-        if (!window.tableau || !window.tableau.extensions) {
+        if (!window.tableau ||
+            !window.tableau.extensions) {
           throw new Error(
             "Tableau Extensions API โหลดไม่สำเร็จ"
           );
@@ -100,11 +139,18 @@
           window.tableau.extensions.dashboardContent.dashboard;
 
         async function refresh() {
+          if (refreshing) {
+            refreshAgain = true;
+            return;
+          }
+
+          refreshing = true;
+
           try {
             const worksheets = dashboard.worksheets || [];
 
-            const ws = worksheets.find(
-              w => w.name.trim().toUpperCase() === "LEADER"
+            const ws = worksheets.find(w =>
+              String(w.name).trim().toUpperCase() === "LEADER"
             );
 
             if (!ws) {
@@ -112,68 +158,184 @@
               return;
             }
 
-            /*const data = await ws.getSummaryDataAsync({
-              maxRows: 0
-            });*/
-            const reader = await ws.getSummaryDataReaderAsync();
-            const data = await reader.getAllPagesAsync();
-            await reader.releaseAsync();
+            let reader;
 
-            const columns = data.columns || [];
+            try {
+              reader = await ws.getSummaryDataReaderAsync();
 
-            const accessIndex = columns.findIndex(c =>
-              String(c.fieldName || "").trim().toUpperCase() === "ACCESS" ||
-              String(c.caption || "").trim().toUpperCase() === "ACCESS"
-            );
+              // getAllPagesAsync อาจคืนข้อมูลหลายหน้า
+              const result = await reader.getAllPagesAsync();
 
-            if (accessIndex < 0) {
-              showError("ไม่พบฟิลด์ ACCESS ใน Worksheet LEADER");
-              return;
+              const pages = Array.isArray(result)
+                ? result
+                : [result];
+
+              let columns = [];
+              const allRows = [];
+
+              for (const page of pages) {
+                if (!page) continue;
+
+                if (page.columns && page.columns.length) {
+                  columns = page.columns;
+                }
+
+                if (page.data && page.data.length) {
+                  allRows.push(...page.data);
+                }
+              }
+
+              console.log("LEADER columns:", columns);
+              console.log("LEADER row count:", allRows.length);
+
+              if (!columns.length) {
+                throw new Error(
+                  "ไม่พบคอลัมน์ข้อมูลจาก Worksheet LEADER"
+                );
+              }
+
+              const accessIndex = getColumnIndex(
+                columns, "ACCESS"
+              );
+
+              if (accessIndex < 0) {
+                throw new Error(
+                  "ไม่พบฟิลด์ ACCESS ใน Summary Data"
+                );
+              }
+
+              // ใช้ RANK จาก SQL ถ้ามีอยู่ในข้อมูลที่ API ส่งมา
+              const rankIndex = columns.findIndex(c => {
+                const fieldName = String(c.fieldName || "")
+                  .trim().toUpperCase();
+
+                const caption = String(c.caption || "")
+                  .trim().toUpperCase();
+
+                return (
+                  fieldName === "RANK" ||
+                  caption === "RANK" ||
+                  fieldName === "SUM(RANK)" ||
+                  caption === "SUM(RANK)" ||
+                  fieldName === "AGG(RANK)" ||
+                  caption === "AGG(RANK)"
+                );
+              });
+
+              const rows = allRows
+                .map((row, originalIndex) => {
+                  const access = cellText(
+                    row[accessIndex]
+                  ).toUpperCase();
+
+                  const rankText = rankIndex >= 0
+                    ? cellText(row[rankIndex])
+                    : "";
+
+                  return {
+                    access: access,
+                    rank: rankText,
+                    originalIndex: originalIndex
+                  };
+                })
+                .filter(row =>
+                  row.access === "YES" ||
+                  row.access === "NO"
+                );
+
+              if (rankIndex >= 0) {
+                rows.sort((a, b) => {
+                  const rankA = Number(a.rank);
+                  const rankB = Number(b.rank);
+
+                  if (!Number.isNaN(rankA) &&
+                      !Number.isNaN(rankB)) {
+                    return rankA - rankB;
+                  }
+
+                  return a.originalIndex - b.originalIndex;
+                });
+
+                status.textContent =
+                  "ACCESS: " + rows.length +
+                  " rows | Sorted by RANK";
+
+              } else {
+                status.textContent =
+                  "ACCESS: " + rows.length +
+                  " rows | RANK not available; using returned order";
+              }
+
+              renderRows(rows);
+              status.style.color = "#b7e4ff";
+
+            } finally {
+              if (reader) {
+                await reader.releaseAsync();
+              }
             }
-
-            const rows = (data.data || [])
-              .map(row =>
-                cellText(row[accessIndex]).toUpperCase()
-              )
-              .filter(value => value === "YES" || value === "NO");
-
-            while (list.firstChild) {
-            list.removeChild(list.firstChild);
-            }
-
-            rows.forEach(value => {
-              const li = document.createElement("li");
-              li.className =
-                "item " + (value === "NO" ? "no" : "yes");
-              li.textContent = value;
-              list.appendChild(li);
-            });
-
-            status.textContent = "ACCESS: " + rows.length + " rows";
-            status.style.color = "#b7e4ff";
 
           } catch (error) {
             showError(
-              "อ่านข้อมูลไม่สำเร็จ: " + error.message
+              "อ่านข้อมูลไม่สำเร็จ: " +
+              (error && error.message
+                ? error.message
+                : String(error))
             );
+
+            console.error("LEADER Extension error:", error);
+
+          } finally {
+            refreshing = false;
+
+            if (refreshAgain) {
+              refreshAgain = false;
+              refresh();
+            }
           }
         }
 
         await refresh();
 
+        // อัปเดตเมื่อมีการเปลี่ยน Filter
         dashboard.worksheets.forEach(ws => {
           try {
             ws.addEventListener(
               window.tableau.TableauEventType.FilterChanged,
               refresh
             );
-          } catch (_) {}
+          } catch (error) {
+            console.warn(
+              "FilterChanged listener:", error
+            );
+          }
+
+          // อัปเดตเมื่อ Summary Data เปลี่ยน
+          try {
+            if (
+              window.tableau.TableauEventType.SummaryDataChanged
+            ) {
+              ws.addEventListener(
+                window.tableau.TableauEventType.SummaryDataChanged,
+                refresh
+              );
+            }
+          } catch (error) {
+            console.warn(
+              "SummaryDataChanged listener:", error
+            );
+          }
         });
 
       } catch (error) {
         showError(
-          "Extension initialization failed: " + error.message
+          "Extension initialization failed: " +
+          (error && error.message
+            ? error.message
+            : String(error))
         );
+
+        console.error("Initialization error:", error);
       }
     });
   </script>
