@@ -1,4 +1,3 @@
-```html
 <!doctype html>
 <html lang="th">
 <head>
@@ -163,7 +162,6 @@
             try {
               reader = await ws.getSummaryDataReaderAsync();
 
-              // getAllPagesAsync อาจคืนข้อมูลหลายหน้า
               const result = await reader.getAllPagesAsync();
 
               const pages = Array.isArray(result)
@@ -204,7 +202,6 @@
                 );
               }
 
-              // ใช้ RANK จาก SQL ถ้ามีอยู่ในข้อมูลที่ API ส่งมา
               const rankIndex = columns.findIndex(c => {
                 const fieldName = String(c.fieldName || "")
                   .trim().toUpperCase();
@@ -297,7 +294,6 @@
 
         await refresh();
 
-        // อัปเดตเมื่อมีการเปลี่ยน Filter
         dashboard.worksheets.forEach(ws => {
           try {
             ws.addEventListener(
@@ -310,7 +306,6 @@
             );
           }
 
-          // อัปเดตเมื่อ Summary Data เปลี่ยน
           try {
             if (
               window.tableau.TableauEventType.SummaryDataChanged
