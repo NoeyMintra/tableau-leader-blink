@@ -114,21 +114,7 @@
             const data = await ws.getSummaryDataAsync({
               maxRows: 0
             });
-            const data = await ws.getSummaryDataAsync({
-              maxRows: 0
-            });
-            const columns = data.columns || [];
-            
-            console.log(
-              "ชื่อคอลัมน์ทั้งหมด:",
-              columns.map(c => ({
-                fieldName: c.fieldName,
-                caption: c.caption
-              }))
-            );
-            
-            console.log("จำนวนแถว:", (data.data || []).length);
-            console.log("ตัวอย่างข้อมูลแถวแรก:", data.data?.[0]);
+            status.textContent = "ดึงข้อมูลสำเร็จ";
             
 
             const columns = data.columns || [];
